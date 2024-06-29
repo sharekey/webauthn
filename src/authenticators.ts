@@ -9,7 +9,7 @@ export function parseAuthBuffer(authData :ArrayBuffer) {
 
     // https://w3c.github.io/webauthn/#sctn-authenticator-data
     let parsed :any = {
-        rpIdHash: utils.toBase64url(authData.slice(0,32)),
+        rpIdHash: utils.toBase64urlLegacy(authData.slice(0,32)),
         flags: {
                 userPresent: !!(flags & 1),
                 //reserved1: !!(flags & 2),

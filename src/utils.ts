@@ -30,9 +30,21 @@ export function parseBase64url(txt :string) :ArrayBuffer {
     return toBuffer(atob(txt))
 }
 
+export function parseBase64UrlLegacy(txt :string) :ArrayBuffer {
+    const newTxt = txt.split('-').join('+').split('_').join('/');
 
-export async function sha256(buffer :ArrayBuffer) :Promise<ArrayBuffer> {
-    return await crypto.subtle.digest('SHA-256', buffer)
+    return toBuffer(Buffer.from(newTxt, 'base64').toString('binary'));
+}
+
+export function toBase64urlLegacy(buffer :ArrayBuffer): string {
+    const txt = Buffer.from(parseBuffer(buffer)).toString('base64');
+
+    return txt.split('-').join('+').split('_').join('/');
+}
+
+export async function sha256(buffer :ArrayBuffer, externalCrypto?: Crypto) :Promise<ArrayBuffer> {
+    return await (externalCrypto ? externalCrypto : crypto)
+        .subtle.digest('SHA-256', buffer)
 }
 
 export function bufferToHex (buffer :ArrayBuffer) :string {
@@ -47,4 +59,4 @@ export function concatenateBuffers(buffer1 :ArrayBuffer, buffer2  :ArrayBuffer) 
     tmp.set(new Uint8Array(buffer1), 0);
     tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
     return tmp;
-  };
+  }

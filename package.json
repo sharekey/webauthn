@@ -9,8 +9,7 @@
   "scripts": {
     "build": "tsc && esbuild ./src/index.ts --platform=neutral --bundle --sourcemap --minify --target=es2022 --outfile=./dist/webauthn.min.js",
     "test": "jest",
-    "dev": "http-server",
-    "postinstall": "npm run build"
+    "dev": "http-server"
   },
   "repository": {
     "type": "git",

@@ -1,4 +1,4 @@
-import { parseAuthentication, parseRegistration } from "./parsers.js";
+import { parseAuthentication, parseRegistration} from "./parsers.js";
 import { AuthenticationEncoded, AuthenticationParsed, CredentialKey, NamedAlgo, RegistrationEncoded, RegistrationParsed } from "./types.js";
 import * as utils from './utils.js'
 
@@ -51,7 +51,12 @@ interface AuthenticationChecks {
 }
 
 
-export async function verifyAuthentication(authenticationRaw: AuthenticationEncoded, credential: CredentialKey, expected: AuthenticationChecks): Promise<AuthenticationParsed> {
+export async function verifyAuthentication(
+    authenticationRaw: AuthenticationEncoded,
+    credential: CredentialKey,
+    expected: AuthenticationChecks,
+    crypto: Crypto,
+): Promise<AuthenticationParsed> {
     if (authenticationRaw.credentialId !== credential.id)
         throw new Error(`Credential ID mismatch: ${authenticationRaw.credentialId} vs ${credential.id}`)
 
@@ -61,7 +66,8 @@ export async function verifyAuthentication(authenticationRaw: AuthenticationEnco
         authenticatorData: authenticationRaw.authenticatorData,
         clientData: authenticationRaw.clientData,
         signature: authenticationRaw.signature,
-        verbose: expected.verbose
+        verbose: expected.verbose,
+        crypto,
     })
 
     if(!isValidSignature)
@@ -82,7 +88,7 @@ export async function verifyAuthentication(authenticationRaw: AuthenticationEnco
 
     // this only works because we consider `rp.origin` and `rp.id` to be the same during authentication/registration
     const rpId = expected.domain ?? new URL(authentication.client.origin).hostname
-    const expectedRpIdHash = utils.toBase64url(await utils.sha256(utils.toBuffer(rpId)))
+    const expectedRpIdHash = utils.toBase64urlLegacy(await utils.sha256(utils.toBuffer(rpId), crypto))
     if (authentication.authenticator.rpIdHash !== expectedRpIdHash)
         throw new Error(`Unexpected RpIdHash: ${authentication.authenticator.rpIdHash} vs ${expectedRpIdHash}`)
 
@@ -131,8 +137,8 @@ function getAlgoParams(algorithm: NamedAlgo): any {
 
 type AlgoParams = AlgorithmIdentifier | RsaHashedImportParams | EcKeyImportParams | HmacImportParams | AesKeyAlgorithm
 
-async function parseCryptoKey(algoParams: AlgoParams, publicKey: string): Promise<CryptoKey> {
-    const buffer = utils.parseBase64url(publicKey)
+async function parseCryptoKey(algoParams: AlgoParams, publicKey: string, crypto: Crypto): Promise<CryptoKey> {
+    const buffer = utils.parseBase64UrlLegacy(publicKey)
     return crypto.subtle.importKey('spki', buffer, algoParams, false, ['verify'])
 }
 
@@ -145,6 +151,7 @@ type VerifyParams = {
     clientData: string, // Base64url encoded
     signature: string, // Base64url encoded
     verbose?: boolean, // Enables debug logs containing sensitive data like crypto keys
+    crypto: Crypto, // External crypto object polyfilled
 }
 
 
@@ -159,28 +166,28 @@ type VerifyParams = {
 [...] For COSEAlgorithmIdentifier -37 (PS256) [...] The signature is not ASN.1 wrapped.
 */
 // see also https://gist.github.com/philholden/50120652bfe0498958fd5926694ba354
-export async function verifySignature({ algorithm, publicKey, authenticatorData, clientData, signature, verbose }: VerifyParams): Promise<boolean> {
+export async function verifySignature({ algorithm, publicKey, authenticatorData, clientData, signature, verbose, crypto }: VerifyParams): Promise<boolean> {
     const algoParams = getAlgoParams(algorithm)
-    let cryptoKey = await parseCryptoKey(algoParams, publicKey)
+    let cryptoKey = await parseCryptoKey(algoParams, publicKey, crypto)
 
     if(verbose) {
         console.debug(cryptoKey)
     }
 
-    let clientHash = await utils.sha256(utils.parseBase64url(clientData));
+    let clientHash = await utils.sha256(utils.parseBase64UrlLegacy(clientData) ,crypto);
 
     // during "login", the authenticatorData is exactly 37 bytes
-    let comboBuffer = utils.concatenateBuffers(utils.parseBase64url(authenticatorData), clientHash)
+    let comboBuffer = utils.concatenateBuffers(utils.parseBase64UrlLegacy(authenticatorData), clientHash)
 
     if(verbose) {
         console.debug('Crypto Algo: ' + JSON.stringify(algoParams))
         console.debug('Public key: ' + publicKey)
-        console.debug('Data: ' + utils.toBase64url(comboBuffer))
+        console.debug('Data: ' + utils.toBase64urlLegacy(comboBuffer))
         console.debug('Signature: ' + signature)
     }
 
     // https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/verify
-    let signatureBuffer = utils.parseBase64url(signature)
+    let signatureBuffer = utils.parseBase64UrlLegacy(signature)
     if(algorithm == 'ES256')
         signatureBuffer = convertASN1toRaw(signatureBuffer)
 

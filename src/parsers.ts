@@ -6,14 +6,14 @@ const utf8Decoder = new TextDecoder('utf-8')
 
 export function parseClient(data :string|ArrayBuffer) :ClientInfo {
     if(typeof data == 'string')
-        data = utils.parseBase64url(data)
+        data = utils.parseBase64UrlLegacy(data)
     return JSON.parse(utf8Decoder.decode(data))
 }
 
 
 export function parseAuthenticator(data :string|ArrayBuffer) :AuthenticatorInfo {
     if(typeof data == 'string')
-        data = utils.parseBase64url(data)
+        data = utils.parseBase64UrlLegacy(data)
     return authenticators.parseAuthBuffer(data)
 }
 
@@ -21,7 +21,7 @@ export function parseAuthenticator(data :string|ArrayBuffer) :AuthenticatorInfo 
 export function parseAttestation(data :string|ArrayBuffer) :unknown {
     //if(typeof data == 'string')
     //    data = utils.parseBase64url(data)
-    // Useless comment, let's at least provide the raw value 
+    // Useless comment, let's at least provide the raw value
     // return "The device attestation proves the authenticity of the device model / aaguid. It's not guaranteed to be included and really complex to parse / verify. Good luck with that one!"
     return data;
 }
